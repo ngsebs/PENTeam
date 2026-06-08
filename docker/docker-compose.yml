@@ -20,6 +20,7 @@ services:
       - ../.mcp:/app/.mcp:ro
       - ../.cursorrules:/app/.cursorrules:ro
       - ../AGENTS.md:/app/AGENTS.md:ro
+      - ../requirements.txt:/app/requirements.txt:ro
       # OpenHands persistence
       - ~/.openhands:/root/.openhands
     environment:
@@ -37,16 +38,16 @@ services:
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-}
       - LLM_BASE_URL=${LLM_BASE_URL:-}
-    # Note: Do NOT use network_mode: host on macOS - not supported
-    # Use default bridge network with host.docker.internal for Ollama access
+      # Python virtual environment
+      - VIRTUAL_ENV=/app/.venv
+      - PATH=/app/.venv/bin:$PATH
+    # Default bridge network with host.docker.internal for Ollama access
     stdin_open: true
     tty: true
-    # Extra hosts for macOS compatibility (host.docker.internal)
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
     ports:
-      # Expose OpenHands API if needed
       - "3000:3000"
 
 networks:

@@ -1,0 +1,25 @@
+# Python dependencies for PENTeam
+# Mathematical research and testing environment
+
+# Core agent framework
+openhands>=0.9.0
+uv>=0.1.0
+
+# HTTP client libraries
+httpx>=0.25.0
+aiohttp>=3.9.0
+
+# Testing framework
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+
+# Mathematical libraries
+numpy>=1.24.0
+sympy>=1.12.0
+scipy>=1.11.0
+
+# Code quality
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.5.0

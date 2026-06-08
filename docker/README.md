@@ -22,6 +22,9 @@ This directory contains Docker configuration for running the mathematical resear
 │   ┌─────────────────────────────────────────────────────┐   │
 │   │              Docker Container                         │   │
 │   │                                                     │   │
+│   │   Python venv: /app/.venv                          │   │
+│   │   Python: 3.11 (auto-activated)                    │   │
+│   │                                                     │   │
 │   │   • Supervisor Agent  → llama3.2:3b               │   │
 │   │   • Creative Math     → llama3.2:3b               │   │
 │   │   • Senior Math       → llama3.2:3b               │   │
@@ -70,12 +73,41 @@ cd docker && ./build.sh
 
 | File | Description |
 |------|-------------|
-| `Dockerfile` | Container image with Python, Ollama CLI |
+| `Dockerfile` | Container image with Python venv |
 | `docker-compose.yml` | Multi-service orchestration |
 | `build.sh` | Build the Docker image |
 | `run.sh` | Start container with Ollama connectivity |
 | `stop.sh` | Stop and remove container |
+| `python-env.sh` | Python environment helper script |
 | `README.md` | This documentation |
+
+## Python Virtual Environment
+
+The container includes a pre-configured Python virtual environment:
+
+```bash
+# Inside container, venv is auto-activated
+python --version              # Python 3.11
+pip list                      # Show installed packages
+
+# Use python-env.sh helper
+/app/python-env.sh activate   # Activate venv
+/app/python-env.sh test       # Run tests
+/app/python-env.sh install    # Install dependencies
+
+# Manual activation
+source /app/.venv/bin/activate
+```
+
+### Installed Packages
+
+| Package | Purpose |
+|---------|---------|
+| openhands | Agent framework |
+| httpx, aiohttp | HTTP clients |
+| pytest | Testing framework |
+| numpy, sympy, scipy | Mathematical libraries |
+| black, flake8, mypy | Code quality tools |
 
 ## How Ollama Connectivity Works (macOS)
 

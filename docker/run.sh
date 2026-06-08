@@ -1,6 +1,6 @@
 #!/bin/bash
 # Run the PENTeam mathematical research team in Docker
-# Supports both Ollama (local models on macOS host) and OpenAI (cloud models)
+# Agents run inside container, Ollama runs on macOS host
 
 set -e
 
@@ -23,20 +23,13 @@ mkdir -p "$PROJECT_ROOT/.openhands"
 mkdir -p "$PROJECT_ROOT/.agents"
 mkdir -p "$PROJECT_ROOT/.mcp"
 
-echo "Starting PENTeam Math Research Team..."
-echo "========================================"
+echo "=========================================="
+echo "  PENTeam Math Research Team"
+echo "=========================================="
 echo ""
-echo "Platform: macOS with Docker Desktop"
+echo "Platform: macOS (Host) + Docker Container"
 echo "Ollama Host: ${OLLAMA_HOST:-host.docker.internal:11434}"
-echo ""
-
-# Display model configuration
-echo "Model Configuration:"
-echo "  Supervisor:        ${SUPERVISOR_MODEL:-llama3.2:3b}"
-echo "  Creative Math:     ${CREATIVE_MATH_MODEL:-llama3.2:3b}"
-echo "  Senior Math:       ${SENIOR_MATH_MODEL:-llama3.2:3b}"
-echo "  Python Coder:      ${PYTHON_CODER_MODEL:-codellama:7b}"
-echo "  Tester:           ${TESTER_MODEL:-llama3.2:3b}"
+echo "Python Environment: /app/.venv (auto-activated)"
 echo ""
 
 # Check Ollama availability on macOS host
@@ -44,14 +37,24 @@ OLLAMA_URL="http://${OLLAMA_HOST:-host.docker.internal:11434}/api/tags"
 if curl -s --max-time 3 "$OLLAMA_URL" > /dev/null 2>&1; then
     echo "✓ Ollama is accessible at $OLLAMA_URL"
     echo "  Available models:"
-    curl -s "$OLLAMA_URL" | jq -r '.models[] | "    - \(.name) (\(.size / 1024 / 1024 / 1024 | . * 1000 | floor / 1000)GB)"' 2>/dev/null || echo "    (run 'ollama list' on host to see models)"
+    curl -s "$OLLAMA_URL" | jq -r '.models[] | "    - \(.name)"' 2>/dev/null || echo "    (run 'ollama list' on host to see models)"
 else
     echo "⚠ Ollama not detected at $OLLAMA_URL"
+    echo ""
     echo "  On macOS host, run:"
     echo "    1. ollama serve"
     echo "    2. ollama pull llama3.2:3b"
     echo "    3. ollama pull codellama:7b"
 fi
+echo ""
+
+# Display model configuration
+echo "Agent Models:"
+echo "  Supervisor:        ${SUPERVISOR_MODEL:-llama3.2:3b}"
+echo "  Creative Math:     ${CREATIVE_MATH_MODEL:-llama3.2:3b}"
+echo "  Senior Math:      ${SENIOR_MATH_MODEL:-llama3.2:3b}"
+echo "  Python Coder:     ${PYTHON_CODER_MODEL:-codellama:7b}"
+echo "  Tester:          ${TESTER_MODEL:-llama3.2:3b}"
 echo ""
 
 # Run the container
@@ -70,6 +73,7 @@ docker run \
     -v "$PROJECT_ROOT/.mcp:/app/.mcp:ro" \
     -v "$PROJECT_ROOT/.cursorrules:/app/.cursorrules:ro" \
     -v "$PROJECT_ROOT/AGENTS.md:/app/AGENTS.md:ro" \
+    -v "$PROJECT_ROOT/requirements.txt:/app/requirements.txt:ro" \
     -v ~/.openhands:/root/.openhands \
     -w /app \
     --add-host=host.docker.internal:host-gateway \

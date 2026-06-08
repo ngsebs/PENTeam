@@ -1,0 +1,28 @@
+# MCP Server Configuration for PENTeam
+# Model Context Protocol server definitions
+
+[servers.filesystem]
+command = "filesystem-server"
+description = "Local file system access for project directories"
+workspace = "/app"
+
+[servers.git]
+command = "git-server"
+description = "Git operations for version control"
+auto_commit = false
+
+[paths.allowed]
+- "/app/AI"
+- "/app/input"
+- "/app/output"
+- "/app/communication"
+- "/app/decisions"
+
+[paths.read_only]
+- "/app/AI"
+
+[paths.read_write]
+- "/app/input"
+- "/app/output"
+- "/app/communication"
+- "/app/decisions"

@@ -1,0 +1,81 @@
+# OpenHands Agent Runtime Configuration
+# This file defines available agents and their configurations for PENTeam
+
+[agents]
+  [agents.supervisor]
+    name = "supervisor"
+    description = "Orchestrates mathematical research team workflow and coordination"
+    tools = ["file_editor", "terminal"]
+    model = "${SUPERVISOR_MODEL:-llama3.2:3b}"
+    provider = "ollama"
+    permission_mode = "confirm_risky"
+    definition_file = "AI/supervisor.md"
+    max_tokens = 4096
+    temperature = 0.7
+
+  [agents.creative_mathematician]
+    name = "creative-mathematician"
+    description = "Creative mathematician who formulates new theorems, proofs, and mathematical concepts"
+    tools = ["file_editor"]
+    model = "${CREATIVE_MATH_MODEL:-llama3.2:3b}"
+    provider = "ollama"
+    permission_mode = "confirm_risky"
+    definition_file = "AI/creative-mathematician.md"
+    max_tokens = 4096
+    temperature = 0.9  # Higher temperature for creative work
+
+  [agents.senior_mathematician]
+    name = "senior-mathematician"
+    description = "Senior mathematician who critically reviews theorems with rigor and intellectual openness"
+    tools = ["file_editor", "terminal"]
+    model = "${SENIOR_MATH_MODEL:-llama3.2:3b}"
+    provider = "ollama"
+    permission_mode = "confirm_risky"
+    definition_file = "AI/senior-mathematician.md"
+    max_tokens = 4096
+    temperature = 0.3  # Lower temperature for critical review
+
+  [agents.python_coder]
+    name = "python-coder"
+    description = "Python programmer who translates mathematical concepts into executable code"
+    tools = ["file_editor", "terminal"]
+    model = "${PYTHON_CODER_MODEL:-codellama:7b}"
+    provider = "ollama"
+    permission_mode = "confirm_risky"
+    definition_file = "AI/python-coder.md"
+    max_tokens = 4096
+    temperature = 0.3  # Lower temperature for code generation
+
+  [agents.tester]
+    name = "tester"
+    description = "QA engineer who tests mathematical implementations with rigorous test cases"
+    tools = ["file_editor", "terminal"]
+    model = "${TESTER_MODEL:-llama3.2:3b}"
+    provider = "ollama"
+    permission_mode = "confirm_risky"
+    definition_file = "AI/tester.md"
+    max_tokens = 4096
+    temperature = 0.5
+
+# Default agent to start with
+default_agent = "supervisor"
+
+# Team coordination settings
+[team]
+  workflow_mode = "sequential"  # sequential, parallel, or hybrid
+  max_parallel_agents = 3
+  communication_mode = "file_based"  # file_based, memory, or mcp
+  checkpoint_interval = 300  # seconds
+
+# Ollama provider settings
+[ollama]
+  base_url = "${OLLAMA_BASE_URL:-http://host.docker.internal:11434}"
+  timeout = 120
+  retry_attempts = 3
+  retry_delay = 5
+
+# OpenAI fallback provider
+[openai]
+  base_url = "${LLM_BASE_URL:-https://api.openai.com/v1}"
+  api_key = "${LLM_API_KEY:-}"
+  timeout = 60

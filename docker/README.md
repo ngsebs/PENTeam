@@ -1,89 +1,289 @@
 # Docker Setup for PENTeam Math Research Team
 
-This directory contains Docker configuration and helper scripts for running the mathematical research team in a containerized environment.
+This directory contains Docker configuration for running the mathematical research team inside Docker containers on macOS, with Ollama running locally on the MacBook Pro M5 host.
 
-## Quick Start
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    MacBook Pro M5 Host                       │
+│                                                             │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │              Ollama (Local Models)                   │   │
+│   │                                                     │   │
+│   │   • llama3.2:3b  (~2GB)                            │   │
+│   │   • codellama:7b  (~4GB)                            │   │
+│   │                                                     │   │
+│   │   Listen: localhost:11434                           │   │
+│   └─────────────────────────────────────────────────────┘   │
+│                         │                                   │
+│                         │ host.docker.internal:11434        │
+│                         ▼                                   │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │              Docker Container                         │   │
+│   │                                                     │   │
+│   │   • Supervisor Agent  → llama3.2:3b               │   │
+│   │   • Creative Math     → llama3.2:3b               │   │
+│   │   • Senior Math       → llama3.2:3b               │   │
+│   │   • Python Coder      → codellama:7b               │   │
+│   │   • Tester            → llama3.2:3b               │   │
+│   │                                                     │   │
+│   │   /app/input, /app/output, /app/communication     │   │
+│   └─────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Quick Start (macOS)
+
+### 1. Start Ollama on MacBook (Host)
 
 ```bash
-# Build the Docker image
-./build.sh
+# Install Ollama (if not installed)
+brew install ollama
 
-# Run the team
+# Start Ollama service
+ollama serve
+
+# Pull recommended models (in another terminal)
+ollama pull llama3.2:3b      # For mathematicians, supervisor, tester
+ollama pull codellama:7b      # For Python coder
+
+# Verify models are available
+ollama list
+```
+
+### 2. Build and Run Docker Container
+
+```bash
+# Navigate to project
+cd PENTeam
+
+# Build Docker image
+cd docker && ./build.sh
+
+# Run container (connects to Ollama on host)
 ./run.sh
-
-# In another terminal, attach to logs
-docker logs -f pent-eam-math-team
 ```
 
 ## Contents
 
 | File | Description |
 |------|-------------|
-| `Dockerfile` | Container image definition with Python and OpenHands |
-| `docker-compose.yml` | Multi-service orchestration (optional) |
+| `Dockerfile` | Container image with Python, Ollama CLI |
+| `docker-compose.yml` | Multi-service orchestration |
 | `build.sh` | Build the Docker image |
-| `run.sh` | Start an interactive container session |
-| `stop.sh` | Stop and remove the container |
+| `run.sh` | Start container with Ollama connectivity |
+| `stop.sh` | Stop and remove container |
 | `README.md` | This documentation |
 
-## Prerequisites
+## How Ollama Connectivity Works (macOS)
 
-- Docker installed and running
-- LLM API key (see Configuration)
+1. **Ollama runs on host**: `ollama serve` listens on `localhost:11434`
+2. **Docker accesses host**: Container uses `host.docker.internal:11434`
+3. **extra_hosts**: Docker Desktop on macOS provides this hostname automatically
 
-## Configuration
+### Connection Details
 
-Create a `.env` file in the project root (or export variables directly):
+| Component | URL |
+|-----------|-----|
+| Ollama on Host | `http://localhost:11434` |
+| Ollama from Container | `http://host.docker.internal:11434` |
+
+The `run.sh` script automatically:
+- Adds `host.docker.internal` to `/etc/hosts` in container
+- Sets `OLLAMA_HOST=host.docker.internal:11434`
+- Verifies Ollama connectivity on startup |
+
+## Ollama Configuration (Local Models)
+
+PENTeam supports local LLM inference via Ollama. Each agent can use a different model optimized for its task.
+
+### Agent-Specific Models
+
+| Agent | Default Model | Purpose | Size |
+|-------|---------------|---------|------|
+| Supervisor | `llama3.2:3b` | Coordination, planning | ~2GB |
+| Creative Mathematician | `llama3.2:3b` | Theorem formulation | ~2GB |
+| Senior Mathematician | `llama3.2:3b` | Critical review | ~2GB |
+| Python Coder | `codellama:7b` | Code generation | ~4GB |
+| Tester | `llama3.2:3b` | Validation, testing | ~2GB |
+
+### Environment Variables
+
+Set these in a `.env` file or export before running:
 
 ```bash
-# Required for LLM access
-export LLM_API_KEY="your-api-key-here"
+# Ollama Configuration
+OLLAMA_HOST=host.docker.internal:11434
+OLLAMA_BASE_URL=http://host.docker.internal:11434
 
-# Optional: Override default model
-export LLM_MODEL="anthropic/claude-sonnet-4-5-20250929"
+# Agent-specific models (override defaults)
+SUPERVISOR_MODEL=llama3.2:3b
+CREATIVE_MATH_MODEL=llama3.2:3b
+SENIOR_MATH_MODEL=llama3.2:3b
+PYTHON_CODER_MODEL=codellama:7b
+TESTER_MODEL=llama3.2:3b
 
-# Optional: Custom API base URL
-export LLM_BASE_URL="https://api.anthropic.com"
+# OpenAI Fallback (if Ollama unavailable)
+LLM_API_KEY=your-api-key
+LLM_MODEL=gpt-4
+LLM_BASE_URL=https://api.openai.com/v1
 ```
 
-## Team Agents
+### Alternative Ollama Models
 
-The Docker container includes the following specialized agents:
+You can customize models based on your hardware. Recommended alternatives:
 
-| Agent | Role |
-|-------|------|
-| `supervisor` | Orchestrates workflow between team members |
-| `creative-mathematician` | Formulates new theorems and proofs |
-| `senior-mathematician` | Critical but open-minded reviewer |
-| `python-coder` | Implements mathematical concepts in Python |
-| `tester` | Validates implementations with rigorous tests |
+```bash
+# Lighter models (for systems with less RAM)
+ollama pull llama3.2:1b      # ~1GB - faster inference
+ollama pull mistral:7b       # ~4GB - good balance
+
+# Code-specialized models
+ollama pull codellama:13b    # ~7GB - better code quality
+ollama pull deepseek-coder:6.7b  # ~4GB - excellent for code
+
+# Reasoning models (for mathematical proofs)
+ollama pull phi3:3.8b        # ~2GB - good reasoning
+ollama pull mathstral:7b     # ~4GB - math-specialized
+```
+
+## OpenAI Fallback
+
+If you prefer cloud-based models or don't have Ollama:
+
+```bash
+# .env file
+export LLM_API_KEY="your-openai-api-key"
+export LLM_MODEL="gpt-4"
+export LLM_BASE_URL="https://api.openai.com/v1"
+
+# Run without Ollama
+./run.sh
+```
+
+## Directory Structure
+
+The container mounts the following directories:
+
+| Host Path | Container Path | Mode | Purpose |
+|-----------|----------------|------|---------|
+| `./AI` | `/app/AI` | read-only | Team agent configurations |
+| `./input` | `/app/input` | read-write | Project descriptions for the team |
+| `./output` | `/app/output` | read-write | Results from completed investigations |
+| `./communication` | `/app/communication` | read-write | Discussion protocols and threads |
+| `./decisions` | `/app/decisions` | read-write | Decisions requiring Project Owner approval |
+| `./.openhands` | `/app/.openhands` | read-write | OpenHands runtime configuration |
+| `./.agents` | `/app/.agents` | read-only | Agent skills and definitions |
+| `./.mcp` | `/app/.mcp` | read-only | MCP server configuration |
+| `./.cursorrules` | `/app/.cursorrules` | read-only | Project conventions |
+| `~/.openhands` | `/root/.openhands` | read-write | OpenHands persistence |
+
+### Input Directory (`/app/input/`)
+Place new project descriptions here for the team to investigate. The Supervisor monitors this directory for new work.
+
+### Output Directory (`/app/output/`)
+Results are organized by project:
+```
+output/
+├── [project-name]/
+│   ├── summary.md
+│   ├── theorems/
+│   ├── implementation/
+│   ├── tests/
+│   └── review/
+```
+
+### Communication Directory (`/app/communication/`)
+Maintains discussion protocols and threads between all team members:
+```
+communication/
+├── threads/[project]/
+├── protocol/[project]-protocol.md
+└── owner-references/[project]-ref-*.md
+```
+
+### Decisions Directory (`/app/decisions/`)
+Stores decisions requiring Project Owner involvement:
+```
+decisions/
+├── pending/[project]/
+├── approved/[project]/
+└── rejected/[project]/
+```
 
 ## Using Docker Compose
 
-For a more declarative setup:
+For a more declarative setup with all services:
 
 ```bash
 cd docker
 docker-compose up --build
 ```
 
-## Volume Mounts
+Docker Compose automatically:
+- Mounts all project directories
+- Sets up Ollama connectivity
+- Configures agent-specific models
 
-The container mounts:
-- `./AI` → `/app/AI` (read-only) — Team agent configurations
-- `./workdir` → `/app/workdir` — Working directory for outputs
-- `~/.openhands` → `/root/.openhands` — OpenHands persistence
+## Troubleshooting (macOS)
 
-## Troubleshooting
+### Ollama not accessible from container
+
+```bash
+# 1. Verify Ollama is running on host
+ollama list
+
+# 2. Test from macOS terminal
+curl http://localhost:11434/api/tags
+
+# 3. Check Docker Desktop is running
+#    Menu Bar → Docker Desktop icon should be visible
+
+# 4. Verify host.docker.internal resolution in container
+docker run --rm alpine cat /etc/hosts | grep host.docker.internal
+```
+
+### Container network issues
+
+```bash
+# Do NOT use network_mode: host on macOS - it's Linux-only
+# The default bridge network works correctly
+
+# If you have issues, check Docker Desktop networking:
+# Docker Desktop → Settings → Resources → Network
+```
+
+### Model download issues (on host)
+
+```bash
+# Check available models
+ollama list
+
+# Pull a specific model
+ollama pull llama3.2:3b
+
+# Test model locally on host
+ollama run llama3.2:3b "Hello, how are you?"
+```
 
 ### Container won't start
-- Ensure Docker daemon is running: `docker info`
-- Check port conflicts: `docker ps`
 
-### LLM API errors
-- Verify `LLM_API_KEY` is set correctly
-- Check network connectivity from container
+```bash
+# Ensure Docker Desktop is running
+# Check: docker info
 
-### Permission issues
-- Ensure your user has Docker permissions (add to `docker` group)
-- Check volume mount permissions
+# Remove old container if exists
+docker rm -f pent-eam-math-team
+
+# Check port conflicts
+docker ps
+```
+
+### M5/M4 Mac Performance
+
+Apple Silicon handles local inference efficiently:
+- M5 Pro/Max: Use larger models (13B+)
+- M5/M4 base: Use smaller models (3B-7B)
+- All models run on CPU (Apple Silicon Neural Engine optional)

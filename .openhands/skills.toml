@@ -1,0 +1,39 @@
+# OpenHands Skills Configuration
+# Links agent skills to agent roles
+
+[skills.mathematical_research]
+  name = "Mathematical Research"
+  description = "Conduct rigorous mathematical research with theorem formulation and proof"
+  trigger_keywords = ["theorem", "proof", "mathematical", "conjecture", "investigation"]
+  assigned_agents = ["creative-mathematician", "senior-mathematician"]
+
+[skills.code_implementation]
+  name = "Code Implementation"
+  description = "Implement mathematical concepts as executable code"
+  trigger_keywords = ["implement", "code", "python", "function", "algorithm"]
+  assigned_agents = ["python-coder"]
+
+[skills.testing]
+  name = "Testing and Validation"
+  description = "Test and validate implementations with comprehensive test suites"
+  trigger_keywords = ["test", "validate", "verify", "qa", "edge case"]
+  assigned_agents = ["tester"]
+
+[skills.coordination]
+  name = "Team Coordination"
+  description = "Orchestrate multi-agent workflows and manage project progress"
+  trigger_keywords = ["coordinate", "delegate", "plan", "supervise", "workflow"]
+  assigned_agents = ["supervisor"]
+
+[skills.review]
+  name = "Critical Review"
+  description = "Review and critique mathematical work with rigor"
+  trigger_keywords = ["review", "critique", "assess", "evaluate", "feedback"]
+  assigned_agents = ["senior-mathematician"]
+
+# Default skill for general interactions
+[skills.default]
+  name = "General Assistance"
+  description = "General mathematical and coding assistance"
+  trigger_keywords = []
+  assigned_agents = ["supervisor"]

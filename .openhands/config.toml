@@ -1,0 +1,70 @@
+# OpenHands Configuration for PENTeam
+# Mathematical Research Team with Ollama on macOS Host
+
+## Runtime Settings
+
+# Agent configuration
+AGENT_MODE=auto
+AGENT_CONCURRENCY=5
+
+# Tool permissions
+PERMISSION_MODE=confirm_risky
+
+# Workspace settings
+WORKSPACE_DIR=/app
+INIT_SCRIPT=
+
+# Agent definitions
+AGENT_DEFINITIONS_DIR=/app/AI
+
+# Directory mappings for agents
+INPUT_DIR=/app/input
+OUTPUT_DIR=/app/output
+COMMUNICATION_DIR=/app/communication
+DECISIONS_DIR=/app/decisions
+
+# Logging
+LOG_LEVEL=INFO
+LOG_FILE=/root/.openhands/logs/openhands.log
+
+## Ollama Configuration (Running on macOS Host)
+
+# Ollama API endpoint - macOS host accessible via host.docker.internal
+OLLAMA_HOST=host.docker.internal:11434
+OLLAMA_BASE_URL=http://host.docker.internal:11434
+
+# Ollama API timeout (seconds)
+OLLAMA_TIMEOUT=120
+
+# Default model (fallback)
+OLLAMA_DEFAULT_MODEL=llama3.2:3b
+
+# Agent-specific Models (lightweight for local inference)
+
+# Supervisor - coordinates team workflow
+SUPERVISOR_MODEL=llama3.2:3b
+
+# Creative Mathematician - theorem formulation
+CREATIVE_MATH_MODEL=llama3.2:3b
+
+# Senior Mathematician - critical review
+SENIOR_MATH_MODEL=llama3.2:3b
+
+# Python Coder - code generation (needs code-specialized model)
+PYTHON_CODER_MODEL=codellama:7b
+
+# Tester - validation and testing
+TESTER_MODEL=llama3.2:3b
+
+## OpenAI Fallback (Cloud Models)
+
+# Use OpenAI if Ollama is not available
+LLM_API_KEY=
+LLM_MODEL=
+LLM_BASE_URL=
+
+## Model Selection Logic
+
+# Priority: 1. Agent-specific env var, 2. OLLAMA_DEFAULT_MODEL, 3. OpenAI fallback
+# Each agent can use a different model based on task requirements
+# Recommended: Use smaller models (3B-7B) for local inference on Apple Silicon

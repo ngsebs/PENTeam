@@ -1,0 +1,112 @@
+# PENTeam Project Conventions
+# Rules for AI coding assistants working on this project
+
+## Project Context
+
+PENTeam is a multi-agent mathematical research team. AI agents collaborate to:
+1. Formulate mathematical theorems and proofs
+2. Implement them as Python code
+3. Test and validate implementations
+4. Review and refine all work
+
+## Directory Conventions
+
+| Directory | Purpose | Access |
+|-----------|---------|--------|
+| `AI/` | Agent role definitions | Read-only |
+| `input/` | Project descriptions | Read/Write |
+| `output/` | Investigation results | Read/Write |
+| `communication/` | Discussion threads | Read/Write |
+| `decisions/` | Owner approval items | Read/Write |
+
+## File Naming Conventions
+
+- **Projects**: Use kebab-case (e.g., `prime-distribution.md`)
+- **Theorems**: `theorem-{NNN}-{title}.md`
+- **Tests**: `test_{module}_{function}.py`
+- **Implementations**: `{theorem_name}.py`
+- **Reviews**: `review-{theorem-id}.md`
+- **Decisions**: `decision-{project}-{nnn}.md`
+
+## Code Conventions
+
+### Python Style
+- Follow PEP 8
+- Use type hints on all functions
+- Include docstrings with mathematical basis
+- Use `sympy` for symbolic mathematics
+- Use `numpy` for numerical computations
+- Use `pytest` for testing
+
+### Mathematical Notation
+- Use LaTeX-style notation in comments
+- Define all variables before use
+- Use `\mathbb{R}`, `\mathbb{N}` for sets
+- Use `\Rightarrow`, `\Leftrightarrow` for implications
+
+### Documentation
+```python
+def function_name(param: Type) -> ReturnType:
+    """
+    Brief description.
+
+    Mathematical basis:
+    - Theorem: [Reference]
+    - Method: [Approach]
+
+    Args:
+        param: Description
+
+    Returns:
+        Description
+
+    Examples:
+        >>> function_name(value)
+        expected_result
+    """
+```
+
+## Testing Requirements
+
+Every implementation must have:
+1. Basic correctness tests
+2. Edge case tests (0, 1, -1, max, min)
+3. Property-based tests
+4. Numerical stability tests
+
+## Mathematical Standards
+
+- All theorems must have:
+  - Precise statement
+  - Defined terms
+  - Explicit assumptions
+  - Complete proof
+  - QED marker (□)
+
+- All proofs must:
+  - Have logical flow
+  - Justify each step
+  - Cover all cases
+  - Use consistent notation
+
+## Review Requirements
+
+- All theorems go through Senior Mathematician review
+- All code goes through Tester validation
+- All decisions requiring Owner approval go to `/decisions/pending/`
+
+## Workflow
+
+1. Read project description from `/input/`
+2. Create output structure in `/output/[project]/`
+3. Document progress in `/communication/threads/[project]/`
+4. Escalate decisions to `/decisions/pending/`
+5. Complete investigation, compile summary
+
+## Do Not
+
+- Skip the review phase
+- Make unilateral decisions on controversial claims
+- Use magic numbers without explanation
+- Write code without corresponding tests
+- Ignore edge cases or counterexamples

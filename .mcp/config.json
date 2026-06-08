@@ -1,0 +1,55 @@
+{
+  "mcp_version": "1.0",
+  "name": "PENTeam Mathematical Research",
+  "description": "MCP configuration for multi-agent mathematical research team",
+
+  "servers": {
+    "filesystem": {
+      "type": "local",
+      "description": "File system access for project directories",
+      "capabilities": ["read", "write"],
+      "paths": [
+        "/app/AI",
+        "/app/input",
+        "/app/output",
+        "/app/communication",
+        "/app/decisions"
+      ]
+    },
+    "git": {
+      "type": "git",
+      "description": "Git operations for version control",
+      "repository": "${GIT_REPO:-}",
+      "branch": "${GIT_BRANCH:-main}"
+    }
+  },
+
+  "resources": {
+    "project_description": {
+      "path": "/app/input/{project}.md",
+      "description": "Project descriptions submitted for investigation",
+      "writable": false
+    },
+    "project_output": {
+      "path": "/app/output/{project}/",
+      "description": "Project results and artifacts",
+      "writable": true
+    },
+    "communication_thread": {
+      "path": "/app/communication/threads/{project}/thread-{n}.md",
+      "description": "Discussion threads between team members",
+      "writable": true
+    },
+    "decision_record": {
+      "path": "/app/decisions/{status}/{project}/decision-{n}.md",
+      "description": "Decision records requiring Project Owner approval",
+      "writable": true
+    }
+  },
+
+  "context_templates": {
+    "project_intake": "Read project description from /app/input/{project}.md and initialize project structure",
+    "task_assignment": "Assign task to {agent} with context from /app/communication/threads/{project}/",
+    "decision_escalation": "Create decision record in /app/decisions/pending/{project}/ for Project Owner review"
+  }
+}

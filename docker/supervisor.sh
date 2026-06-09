@@ -13,6 +13,19 @@ LOG_FILE="/app/communication/supervisor.log"
 OLLAMA_HOST="${OLLAMA_HOST:-localhost:11434}"
 OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://localhost:11434}"
 
+# iMessage Configuration (Resilient Mode)
+IMESSAGE_QUEUE_FILE="${COMM_DIR}/imessage_queue.txt"
+IMESSAGE_SENT_FILE="${COMM_DIR}/imessage_sent.log"
+IMESSAGE_OFFLINE_DIR="${COMM_DIR}/imessage_offline"
+IMESSAGE_OFFLINE_INDEX="${IMESSAGE_OFFLINE_DIR}/index.json"
+HOST_CHECK_URL="${HOST_CHECK_URL:-https://www.apple.com}"
+HOST_CHECK_ENABLED="${HOST_CHECK_ENABLED:-true}"
+
+# Connection state
+HOST_ONLINE=true
+LAST_HOST_CHECK=""
+HOST_OFFLINE_SINCE=""
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -35,6 +48,178 @@ log_warn() {
 log_error() {
     log "${RED}[ERROR]${NC} $1"
 }
+
+# ============================================
+# iMessage Resilience Functions
+# ============================================
+
+# Check if host is online (can reach external network)
+check_host_online() {
+    if [ "$HOST_CHECK_ENABLED" != "true" ]; then
+        return 0
+    fi
+    
+    if curl -s --max-time 5 --head "$HOST_CHECK_URL" > /dev/null 2>&1; then
+        return 0
+    fi
+    return 1
+}
+
+# Initialize offline message storage
+init_offline_storage() {
+    mkdir -p "$IMESSAGE_OFFLINE_DIR"
+    if [ ! -f "$IMESSAGE_OFFLINE_INDEX" ]; then
+        echo '{"messages": [], "last_sync": null}' > "$IMESSAGE_OFFLINE_INDEX"
+    fi
+}
+
+# Queue message for sending (handles offline gracefully)
+queue_imessage() {
+    local recipient="$1"
+    local message="$2"
+    local message_type="${3:-notification}"  # notification, milestone, decision, status
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    
+    # Create message entry
+    local message_id="msg_$(date +%s)_$RANDOM"
+    local message_json="{\"id\":\"$message_id\",\"timestamp\":\"$timestamp\",\"type\":\"$message_type\",\"recipient\":\"$recipient\",\"message\":\"$(echo "$message" | jq -Rs .)\"}"
+    
+    if check_host_online; then
+        # Host is online - add to queue
+        if [ "$HOST_ONLINE" = "false" ]; then
+            log_info "Host back online - will send queued messages"
+            flush_offline_queue
+        fi
+        
+        echo "${recipient}|${message}" >> "$IMESSAGE_QUEUE_FILE"
+        log_info "iMessage queued for $recipient"
+        HOST_ONLINE=true
+        HOST_OFFLINE_SINCE=""
+    else
+        # Host is offline - store in offline queue
+        if [ "$HOST_ONLINE" = "true" ]; then
+            log_warn "Host offline - storing message in offline queue"
+            HOST_OFFLINE_SINCE="${HOST_OFFLINE_SINCE:-$(date '+%Y-%m-%d %H:%M:%S')}"
+        fi
+        
+        # Save to offline storage
+        local offline_file="${IMESSAGE_OFFLINE_DIR}/${message_id}.json"
+        echo "$message_json" > "$offline_file"
+        
+        # Update index
+        local messages=$(jq '.messages + [{"id": "'"$message_id"'", "type": "'"$message_type"'", "recipient": "'"$recipient"'", "timestamp": "'"$timestamp"'"}]' "$IMESSAGE_OFFLINE_INDEX" 2>/dev/null || echo "[]")
+        jq --argjson msgs "$messages" --arg ts "$timestamp" '.messages = $msgs | .last_sync = $ts' "$IMESSAGE_OFFLINE_INDEX" > "${IMESSAGE_OFFLINE_INDEX}.tmp" && mv "${IMESSAGE_OFFLINE_INDEX}.tmp" "$IMESSAGE_OFFLINE_INDEX"
+        
+        log_info "iMessage stored offline: $message_id"
+        HOST_ONLINE=false
+    fi
+}
+
+# Flush all offline messages when host comes back online
+flush_offline_queue() {
+    if [ ! -d "$IMESSAGE_OFFLINE_DIR" ] || [ -z "$(ls -A "$IMESSAGE_OFFLINE_DIR"/*.json 2>/dev/null | grep -v index.json)" ]; then
+        return 0
+    fi
+    
+    log_info "Flushing offline message queue..."
+    
+    local queued_count=0
+    local queued_types=()
+    
+    # Collect all offline messages
+    for msg_file in "$IMESSAGE_OFFLINE_DIR"/msg_*.json; do
+        [ -f "$msg_file" ] || continue
+        local id=$(basename "$msg_file" .json)
+        local msg_data=$(cat "$msg_file")
+        local recipient=$(echo "$msg_data" | jq -r '.recipient')
+        local msg_text=$(echo "$msg_data" | jq -r '.message' | sed 's/^"\(.*\)"$/\1/')
+        local msg_type=$(echo "$msg_data" | jq -r '.type')
+        
+        # Add to send queue
+        echo "${recipient}|${msg_text}" >> "$IMESSAGE_QUEUE_FILE"
+        queued_count=$((queued_count + 1))
+        queued_types+=("$msg_type")
+        
+        # Mark as queued (move to sent folder)
+        mv "$msg_file" "${IMESSAGE_OFFLINE_DIR}/sent/"
+    done
+    
+    # Generate summary message
+    if [ $queued_count -gt 0 ]; then
+        local summary="🔄 RECONNECTED - ${queued_count} queued message(s) now sending:"
+        local type_counts=$(printf '%s\n' "${queued_types[@]}" | sort | uniq -c | sed 's/^ *//;s/ /x /')
+        summary+="\n${type_counts}"
+        summary+="\n\nMessages will arrive shortly."
+        
+        echo "SUMMARY|${summary}" >> "$IMESSAGE_QUEUE_FILE"
+        log_info "Added reconnect summary to queue"
+    fi
+    
+    # Update index
+    jq '.messages = [] | .last_sync = "'"$(date '+%Y-%m-%d %H:%M:%S')"'"' "$IMESSAGE_OFFLINE_INDEX" > "${IMESSAGE_OFFLINE_INDEX}.tmp" && mv "${IMESSAGE_OFFLINE_INDEX}.tmp" "$IMESSAGE_OFFLINE_INDEX"
+    
+    log_info "Flushed $queued_count offline messages"
+}
+
+# Generate summary of missed notifications
+generate_offline_summary() {
+    if [ ! -f "$IMESSAGE_OFFLINE_INDEX" ]; then
+        return 0
+    fi
+    
+    local total=$(jq '.messages | length' "$IMESSAGE_OFFLINE_INDEX")
+    if [ "$total" -eq 0 ]; then
+        return 0
+    fi
+    
+    local offline_since="${HOST_OFFLINE_SINCE:-Unknown}"
+    local now=$(date '+%Y-%m-%d %H:%M:%S')
+    
+    local summary="📱 PENTeam Offline Summary
+━━━━━━━━━━━━━━━━━━━━━━
+⏰ Offline since: $offline_since
+⏰ Reconnected at: $now
+📊 Total missed: $total notifications
+
+📋 Missed Events:"
+    
+    # List each missed message
+    local messages=$(jq -r '.messages[] | "• [\(.type)] \(.timestamp) - sent to \(.recipient)"' "$IMESSAGE_OFFLINE_INDEX" 2>/dev/null)
+    summary+="
+${messages}"
+    
+    summary+="
+━━━━━━━━━━━━━━━━━━━━━━
+All queued messages are now being delivered."
+    
+    echo "$summary"
+}
+
+# Get offline queue status
+get_offline_status() {
+    if [ ! -f "$IMESSAGE_OFFLINE_INDEX" ]; then
+        echo "Offline storage: Not initialized"
+        return
+    fi
+    
+    local total=$(jq '.messages | length' "$IMESSAGE_OFFLINE_INDEX")
+    local last_sync=$(jq -r '.last_sync' "$IMESSAGE_OFFLINE_INDEX")
+    
+    echo "━━━━━━━━━━━━━━━━━━━━━━"
+    echo "📦 Offline Message Queue"
+    echo "━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  Total queued: $total"
+    echo "  Last sync: ${last_sync:-Never}"
+    if [ -n "$HOST_OFFLINE_SINCE" ]; then
+        echo "  Offline since: $HOST_OFFLINE_SINCE"
+    fi
+    echo "  Host online: $([ "$HOST_ONLINE" = "true" ] && echo "✓ Yes" || echo "✗ No")"
+    echo "━━━━━━━━━━━━━━━━━━━━━━"
+}
+
+# ============================================
+# LLM Functions
+# ============================================
 
 # Call Ollama API for LLM inference
 call_ollama() {
@@ -84,6 +269,10 @@ init_directories() {
     mkdir -p "$DEC_DIR/approved"
     mkdir -p "$DEC_DIR/rejected"
     mkdir -p "$OUTPUT_DIR/templates"
+    
+    # Initialize iMessage offline storage
+    mkdir -p "$IMESSAGE_OFFLINE_DIR/sent"
+    init_offline_storage
     
     log_info "Directories initialized at /app/"
 }
@@ -499,7 +688,7 @@ show_status() {
 run_supervisor() {
     log_info "Starting PENTeam Supervisor..."
     
-    # Initialize directories
+    # Initialize directories and offline storage
     init_directories
     
     # Check Ollama - continue even if not available (will retry)
@@ -507,6 +696,20 @@ run_supervisor() {
         log_warn "Ollama not available - will continue monitoring and retry"
     else
         log_info "Ollama connection verified"
+    fi
+    
+    # Check initial host connectivity
+    if check_host_online; then
+        log_info "Host connectivity: Online"
+        # Check if there are queued offline messages
+        local queued_count=$(jq '.messages | length' "$IMESSAGE_OFFLINE_INDEX" 2>/dev/null || echo "0")
+        if [ "$queued_count" -gt 0 ]; then
+            log_info "Flushing $queued_count queued messages..."
+            flush_offline_queue
+        fi
+    else
+        log_warn "Host connectivity: Offline - messages will be queued"
+        HOST_OFFLINE_SINCE=$(date '+%Y-%m-%d %H:%M:%S')
     fi
     
     log_info "Supervisor ready - monitoring $INPUT_DIR"
@@ -520,6 +723,21 @@ run_supervisor() {
         
         # Check for new projects every 10 seconds
         check_new_projects
+        
+        # Periodic host connectivity check (every 30 seconds)
+        if check_host_online; then
+            if [ "$HOST_ONLINE" = "false" ]; then
+                log_info "Host back online!"
+                flush_offline_queue
+                HOST_ONLINE=true
+            fi
+        else
+            if [ "$HOST_ONLINE" = "true" ]; then
+                log_warn "Host went offline - messages will be queued"
+                HOST_OFFLINE_SINCE=$(date '+%Y-%m-%d %H:%M:%S')
+                HOST_ONLINE=false
+            fi
+        fi
         
         # Periodic Ollama health check (every 5 minutes)
         if ! curl -s --max-time 3 "$OLLAMA_BASE_URL/api/tags" > /dev/null 2>&1; then
@@ -541,18 +759,26 @@ Usage: supervisor.sh [COMMAND]
 Commands:
     start       Start the supervisor (monitors input directory)
     status      Show current team status
+    offline     Show offline message queue status
     process     Manually process a project file
     help        Show this help message
 
 Examples:
     ./supervisor.sh start      # Start monitoring for new projects
     ./supervisor.sh status     # Show current status
+    ./supervisor.sh offline    # Check offline queue
     ./supervisor.sh process input/my-project.md  # Process specific file
 
 Environment:
     INPUT_DIR      Project input directory (default: /app/input)
     OUTPUT_DIR     Project output directory (default: /app/output)
     OLLAMA_HOST    Ollama API endpoint (default: localhost:11434)
+    HOST_CHECK_URL URL to check host connectivity (default: https://www.apple.com)
+    HOST_CHECK_ENABLED Enable host connectivity checks (default: true)
+
+iMessage Resilience:
+    When host is offline, messages are stored locally.
+    When host comes back online, queued messages are sent with a summary.
 
 EOF
 }
@@ -564,6 +790,10 @@ case "${1:-start}" in
         ;;
     status)
         show_status
+        ;;
+    offline)
+        init_offline_storage
+        get_offline_status
         ;;
     process)
         if [ -z "$2" ]; then

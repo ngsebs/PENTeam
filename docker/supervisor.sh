@@ -447,7 +447,7 @@ Output revised theorems in the same format:
         log_warn "Theorems identified as analytically sound but computationally problematic"
         
         # Create decision record for project owner
-        local decision_dir="$DEC_DIR/$project_name"
+        local decision_dir="$DEC_DIR/pending/$project_name"
         mkdir -p "$decision_dir"
         
         cat > "$decision_dir/decision-001.md" << EOF
@@ -764,7 +764,7 @@ EOF
     if echo "$summary" | grep -qiE "next step|further investigation|future work|recommended|proposed follow"; then
         log_info "Phase 5.5: Summary contains next steps - escalating to Project Owner..."
         
-        local next_steps_dir="$DEC_DIR/$project_name"
+        local next_steps_dir="$DEC_DIR/pending/$project_name"
         mkdir -p "$next_steps_dir"
         
         cat > "$next_steps_dir/next-steps-001.md" << 'NEXTStepSFILE'
@@ -938,7 +938,7 @@ show_status() {
     echo -e "  ${GREEN}●${NC} Active projects: $active"
     
     # Pending decisions
-    local decisions=$(find "$DEC_DIR" -name "*.md" 2>/dev/null | wc -l)
+    local decisions=$(find "$DEC_DIR/pending" -name "*.md" 2>/dev/null | wc -l)
     echo -e "  ${RED}!${NC} Pending decisions: $decisions"
     
     echo ""

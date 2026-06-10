@@ -202,7 +202,7 @@ cd docker && ./build.sh && ./run.sh
 ### Architecture
 
 - **Host (MacBook M5)**: Ollama at `localhost:11434`
-- **Container**: Accesses Ollama via `localhost:11434` (host network mode)
+- **Container**: Accesses Ollama via `host.docker.internal:11434` (bridge network mode)
 - **No GPU config needed**: Apple Silicon runs inference efficiently on CPU
 
 ### Environment Variables
@@ -210,9 +210,9 @@ cd docker && ./build.sh && ./run.sh
 Create `.env` from `.env.example` or export:
 
 ```bash
-# Ollama (on macOS host - container uses host network mode)
-export OLLAMA_HOST=localhost:11434
-export OLLAMA_BASE_URL=http://localhost:11434
+# Ollama (on macOS host - container uses host.docker.internal)
+export OLLAMA_HOST=host.docker.internal:11434
+export OLLAMA_BASE_URL=http://host.docker.internal:11434
 
 # Agent-specific models
 export SUPERVISOR_MODEL=llama3.2:3b

@@ -140,19 +140,19 @@ source /app/.venv/bin/activate
 ## How Ollama Connectivity Works (macOS)
 
 1. **Ollama runs on host**: `ollama serve` listens on `localhost:11434`
-2. **Docker uses host network mode**: Container accesses `localhost:11434` directly
-3. **No extra_hosts needed**: Host network mode provides direct localhost access
+2. **Docker uses bridge network**: Container accesses `host.docker.internal:11434` to reach host
+3. **Extra hosts configured**: Docker Desktop maps `host.docker.internal` to host machine
 
 ### Connection Details
 
 | Component | URL |
 |-----------|-----|
 | Ollama on Host | `http://localhost:11434` |
-| Ollama from Container | `http://localhost:11434` (via host network) |
+| Ollama from Container | `http://host.docker.internal:11434` (via bridge network) |
 
-The `run.sh` script automatically:
-- Uses `--network host` flag for direct localhost access
-- Sets `OLLAMA_HOST=localhost:11434`
+The `docker-compose.yml` and Dockerfile automatically:
+- Set `OLLAMA_HOST=host.docker.internal:11434`
+- Set `OLLAMA_BASE_URL=http://host.docker.internal:11434`
 - Retries connection if Ollama not immediately available
 - Verifies Ollama connectivity on startup |
 
@@ -175,9 +175,9 @@ PENTeam supports local LLM inference via Ollama. Each agent can use a different 
 Set these in a `.env` file or export before running:
 
 ```bash
-# Ollama Configuration (container uses host network mode)
-OLLAMA_HOST=localhost:11434
-OLLAMA_BASE_URL=http://localhost:11434
+# Ollama Configuration (container uses host.docker.internal for macOS)
+OLLAMA_HOST=host.docker.internal:11434
+OLLAMA_BASE_URL=http://host.docker.internal:11434
 
 # Agent-specific models (override defaults)
 SUPERVISOR_MODEL=llama3.2:3b
@@ -302,23 +302,24 @@ curl http://localhost:11434/api/tags
 # 3. Check Docker Desktop is running
 #    Menu Bar → Docker Desktop icon should be visible
 
-# 4. Verify host network mode is enabled in Docker Desktop
-#    Docker Desktop → Settings → General → ✓ Use Docker VMM
+# 4. Verify host.docker.internal is configured
+#    Docker Desktop → Settings → Resources → Network → ✓ Enable host.docker.internal
 
-# 5. Test localhost access in container
-docker run --rm --network host alpine sh -c "curl http://localhost:11434/api/tags"
+# 5. Test host.docker.internal access in container
+docker run --rm --add-host=host.docker.internal:host-gateway alpine sh -c "curl http://host.docker.internal:11434/api/tags"
 ```
 
 ### Container network issues
 
 ```bash
-# Host network mode is used for direct localhost access
-# This works on both macOS and Linux with Docker Desktop
+# Bridge network mode uses host.docker.internal for host access
+# Docker Desktop automatically configures this on macOS
 
 # If you have issues, check:
 # 1. Docker Desktop networking settings
 # 2. No port 11434 conflicts
 # 3. Ollama is actually listening on localhost
+# 4. Enable host.docker.internal in Docker Desktop settings
 ```
 
 ### Supervisor not starting

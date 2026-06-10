@@ -259,16 +259,24 @@ Propose 2-3 concrete theorems or mathematical statements that can be explored co
     
     update_task_status "$project_name" "TASK-002" "Completed"
     
-    # Phase 2: Senior Mathematician - Review
+    # Phase 2: Senior Mathematician - Review with Feedback Loop
     log_info "Phase 2: Senior Mathematician reviewing theorems..."
-    update_task_status "$project_name" "TASK-003" "In Progress"
-    update_progress "$project_name" "Senior Mathematician" "Reviewing proposed theorems"
     
-    # Read theorems file with fallback
-    local theorems_for_review=""
-    [ -f "$project_dir/theorems/proposed.md" ] && theorems_for_review=$(cat "$project_dir/theorems/proposed.md")
+    # Feedback loop: keep reviewing until all theorems are approved or max iterations reached
+    local max_review_iterations=3
+    local iteration=1
+    local review_complete=false
     
-    local review_prompt="You are a Senior Mathematician. Critically review these proposed theorems:
+    while [ "$review_complete" = "false" ] && [ $iteration -le $max_review_iterations ]; do
+        log_info "Review iteration $iteration of $max_review_iterations"
+        update_task_status "$project_name" "TASK-003" "In Progress"
+        update_progress "$project_name" "Senior Mathematician" "Review iteration $iteration"
+        
+        # Read current theorems file with fallback
+        local theorems_for_review=""
+        [ -f "$project_dir/theorems/proposed.md" ] && theorems_for_review=$(cat "$project_dir/theorems/proposed.md")
+        
+        local review_prompt="You are a Senior Mathematician. Critically review these proposed theorems:
 
 Project: $project_name
 
@@ -282,16 +290,72 @@ For each theorem, provide:
 4. **Recommendation**: Approve, modify, or reject
 
 Be rigorous but open to innovative approaches."
+
+        local review=$(call_ollama "$model" "$review_prompt")
+        
+        echo "# Review: $project_name" > "$project_dir/review/critique.md"
+        echo "" >> "$project_dir/review/critique.md"
+        echo "## Senior Mathematician Review (Iteration $iteration)" >> "$project_dir/review/critique.md"
+        echo "" >> "$project_dir/review/critique.md"
+        echo "$review" >> "$project_dir/review/critique.md"
+        echo "" >> "$project_dir/review/critique.md"
+        echo "*Generated: $(date '+%Y-%m-%d %H:%M:%S')*" >> "$project_dir/review/critique.md"
+        
+        # Check if review contains any rejections or modifications needed
+        local review_lower=$(echo "$review" | tr '[:upper:]' '[:lower:]')
+        
+        if echo "$review_lower" | grep -q "reject\|rejected\|cannot be verified\|flawed"; then
+            log_warn "Senior Mathematician identified issues requiring revision"
+            
+            # Extract the review content for feedback to Creative Mathematician
+            local revision_prompt="You are a Creative Mathematician. The Senior Mathematician has reviewed your proposed theorems and found issues that need to be addressed:
+
+Project: $project_name
+
+Original Theorems:
+${theorems_for_review}
+
+Senior Mathematician Feedback:
+${review}
+
+Please revise the rejected or problematic theorems based on the feedback.
+For each issue:
+1. Acknowledge the concern raised
+2. Either fix the theorem or provide a new approach
+3. Ensure all theorems are computationally verifiable
+
+Output revised theorems in the same format:
+- **Theorem [N]**: [Revised formal statement]
+- **Approach**: [How to investigate]
+- **Expected outcome**: [What we might discover]"
+            
+            log_info "Sending rejected theorems back to Creative Mathematician for revision..."
+            update_progress "$project_name" "Creative Mathematician" "Revising theorems based on Senior Mathematician feedback"
+            
+            local revised_theorems=$(call_ollama "$model" "$revision_prompt")
+            
+            # Save revised theorems with history
+            echo "" >> "$project_dir/theorems/proposed.md"
+            echo "---" >> "$project_dir/theorems/proposed.md"
+            echo "## Revision $iteration (Based on Senior Mathematician Feedback)" >> "$project_dir/theorems/proposed.md"
+            echo "" >> "$project_dir/theorems/proposed.md"
+            echo "$revised_theorems" >> "$project_dir/theorems/proposed.md"
+            echo "" >> "$project_dir/theorems/proposed.md"
+            echo "*Generated: $(date '+%Y-%m-%d %H:%M:%S')*" >> "$project_dir/theorems/proposed.md"
+            
+            log_info "Revised theorems saved, continuing to next review iteration..."
+            ((iteration++))
+        else
+            log_info "All theorems approved by Senior Mathematician"
+            update_progress "$project_name" "Senior Mathematician" "All theorems approved"
+            review_complete=true
+        fi
+    done
     
-    local review=$(call_ollama "$model" "$review_prompt")
-    
-    echo "# Review: $project_name" > "$project_dir/review/critique.md"
-    echo "" >> "$project_dir/review/critique.md"
-    echo "## Senior Mathematician Review" >> "$project_dir/review/critique.md"
-    echo "" >> "$project_dir/review/critique.md"
-    echo "$review" >> "$project_dir/review/critique.md"
-    echo "" >> "$project_dir/review/critique.md"
-    echo "*Generated: $(date '+%Y-%m-%d %H:%M:%S')*" >> "$project_dir/review/critique.md"
+    if [ $iteration -gt $max_review_iterations ] && [ "$review_complete" = "false" ]; then
+        log_warn "Max review iterations reached. Proceeding with current theorems."
+        update_progress "$project_name" "Senior Mathematician" "Max iterations reached - proceeding with current theorems"
+    fi
     
     update_task_status "$project_name" "TASK-003" "Completed"
     

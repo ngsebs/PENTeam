@@ -49,6 +49,32 @@ log_error() {
 }
 
 # Call Ollama API for LLM inference
+# Safe write function - handles special characters in content
+safe_write() {
+    local file="$1"
+    local content="$2"
+    printf '%s' "$content" > "$file"
+}
+
+# Write multiline content safely to file (appends)
+safe_append() {
+    local file="$1"
+    local content="$2"
+    printf '%s\n' "$content" >> "$file"
+}
+
+# Write LLM response safely using temp file to handle special chars
+write_response() {
+    local file="$1"
+    local response="$2"
+    # Use temp file to safely write content with special characters
+    local temp_file
+    temp_file=$(mktemp)
+    printf '%s' "$response" > "$temp_file"
+    cat "$temp_file" >> "$file"
+    rm -f "$temp_file"
+}
+
 call_ollama() {
     local model="$1"
     local prompt="$2"
@@ -56,9 +82,21 @@ call_ollama() {
     
     response=$(curl -s --max-time 120 "$OLLAMA_BASE_URL/api/generate" \
         -H "Content-Type: application/json" \
-        -d "{\"model\": \"$model\", \"prompt\": \"$prompt\", \"stream\": false}")
+        -d "{\"model\": \"$model\", \"prompt\": $(printf '%s' "$prompt" | jq -Rs .), \"stream\": false}")
     
-    echo "$response" | jq -r '.response // .error' 2>/dev/null
+    # Extract response safely, handle errors
+    local extracted
+    extracted=$(echo "$response" | jq -r '.response // empty' 2>/dev/null)
+    
+    if [ -z "$extracted" ]; then
+        # Try to get error message
+        local error_msg
+        error_msg=$(echo "$response" | jq -r '.error // "Unknown error"' 2>/dev/null)
+        echo "Error: $error_msg"
+        return 1
+    fi
+    
+    echo "$extracted"
 }
 
 # Check Ollama availability with retries
@@ -222,7 +260,7 @@ Provide:
     echo "" >> "$project_dir/theorems/analysis.md"
     echo "## Analysis by Creative Mathematician" >> "$project_dir/theorems/analysis.md"
     echo "" >> "$project_dir/theorems/analysis.md"
-    echo "$analysis" >> "$project_dir/theorems/analysis.md"
+    write_response "$project_dir/theorems/analysis.md" "$analysis"
     echo "" >> "$project_dir/theorems/analysis.md"
     echo "*Generated: $(date '+%Y-%m-%d %H:%M:%S')*" >> "$project_dir/theorems/analysis.md"
     
@@ -253,7 +291,7 @@ Propose 2-3 concrete theorems or mathematical statements that can be explored co
     echo "" >> "$project_dir/theorems/proposed.md"
     echo "## Proposed Theorems by Creative Mathematician" >> "$project_dir/theorems/proposed.md"
     echo "" >> "$project_dir/theorems/proposed.md"
-    echo "$theorems" >> "$project_dir/theorems/proposed.md"
+    write_response "$project_dir/theorems/proposed.md" "$theorems"
     echo "" >> "$project_dir/theorems/proposed.md"
     echo "*Generated: $(date '+%Y-%m-%d %H:%M:%S')*" >> "$project_dir/theorems/proposed.md"
     
@@ -297,7 +335,7 @@ Be rigorous but open to innovative approaches."
         echo "" >> "$project_dir/review/critique.md"
         echo "## Senior Mathematician Review (Iteration $iteration)" >> "$project_dir/review/critique.md"
         echo "" >> "$project_dir/review/critique.md"
-        echo "$review" >> "$project_dir/review/critique.md"
+        write_response "$project_dir/review/critique.md" "$review"
         echo "" >> "$project_dir/review/critique.md"
         echo "*Generated: $(date '+%Y-%m-%d %H:%M:%S')*" >> "$project_dir/review/critique.md"
         
@@ -339,7 +377,7 @@ Output revised theorems in the same format:
             echo "---" >> "$project_dir/theorems/proposed.md"
             echo "## Revision $iteration (Based on Senior Mathematician Feedback)" >> "$project_dir/theorems/proposed.md"
             echo "" >> "$project_dir/theorems/proposed.md"
-            echo "$revised_theorems" >> "$project_dir/theorems/proposed.md"
+            write_response "$project_dir/theorems/proposed.md" "$revised_theorems"
             echo "" >> "$project_dir/theorems/proposed.md"
             echo "*Generated: $(date '+%Y-%m-%d %H:%M:%S')*" >> "$project_dir/theorems/proposed.md"
             
@@ -555,7 +593,7 @@ Use sympy for symbolic math, numpy for numerical computation."
     echo "Generated: $(date '+%Y-%m-%d %H:%M:%S')" >> "$project_dir/implementation/solution.py"
     echo '"""' >> "$project_dir/implementation/solution.py"
     echo "" >> "$project_dir/implementation/solution.py"
-    echo "$implementation" >> "$project_dir/implementation/solution.py"
+    write_response "$project_dir/implementation/solution.py" "$implementation"
     
     update_task_status "$project_name" "TASK-004" "Completed"
     
@@ -600,7 +638,7 @@ Format as valid pytest code with assertions."
     echo "if _IMPL_DIR not in sys.path:" >> "$project_dir/tests/test_solution.py"
     echo "    sys.path.insert(0, _IMPL_DIR)" >> "$project_dir/tests/test_solution.py"
     echo "" >> "$project_dir/tests/test_solution.py"
-    echo "$tests" >> "$project_dir/tests/test_solution.py"
+    write_response "$project_dir/tests/test_solution.py" "$tests"
     
     update_task_status "$project_name" "TASK-005" "Completed"
     update_task_status "$project_name" "TASK-006" "In Progress"

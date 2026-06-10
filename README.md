@@ -164,6 +164,37 @@ source /app/.venv/bin/activate
 
 # Check team status
 /app/docker/monitor.sh
+
+# View debug logs (LLM interaction tracing)
+/app/docker/monitor.sh
+
+# View LLM debug log (detailed API calls)
+cat /app/communication/debug.log
+```
+
+### Debug Logging
+
+Debug logging is **enabled by default** to help troubleshoot LLM interactions. The debug log is written to `/app/communication/debug.log`.
+
+**What it logs:**
+- Model used and prompt length
+- Escaped prompt (JSON-encoded)
+- Raw response from Ollama
+- Extracted response length
+- File write operations
+
+**To disable debug logging:**
+```bash
+DEBUG_LOG=false docker-compose up
+```
+
+**To view debug log:**
+```bash
+# Inside container
+cat /app/communication/debug.log
+
+# From host
+docker exec pent-eam-math-team cat /app/communication/debug.log
 ```
 
 ### Or using Docker Compose

@@ -213,8 +213,8 @@ source /app/.venv/bin/activate
 # Full system diagnostic
 /app/docker/debug.sh
 
-# Run OpenHands agent
-/app/docker/openhands.sh
+# View LLM debug log (detailed API tracing)
+/app/communication/debug.log
 
 # Check Ollama status
 curl http://localhost:11434/api/tags
@@ -237,6 +237,28 @@ cat /app/communication/supervisor.log
 | Ollama connection refused | Ensure Ollama is running on host: `ollama serve` |
 | Supervisor not starting | Check logs: `cat /app/communication/supervisor.log` |
 | Import errors | Activate venv: `source /app/.venv/bin/activate` |
+| Empty output files / LLM errors | Check debug log: `cat /app/communication/debug.log` |
+| Invalid JSON / parse errors | Enable DEBUG_LOG to trace LLM interactions |
+
+### Debug Logging
+
+Debug logging is enabled by default (DEBUG_LOG=true) to help troubleshoot LLM issues.
+
+**View debug log:**
+```bash
+cat /app/communication/debug.log
+```
+
+**What it shows:**
+- LLM model and prompt details
+- JSON encoding/escaping
+- Raw responses from Ollama
+- File write operations
+
+**Disable if logs get too large:**
+```bash
+DEBUG_LOG=false docker-compose up
+```
 
 ### Run Modes
 

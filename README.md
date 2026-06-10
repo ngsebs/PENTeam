@@ -108,6 +108,7 @@ The workflow includes two important feedback mechanisms:
 - Project Owner decides: Continue / Document / End
 - Use `/app/docker/decide.sh` for interactive decision-making
 - Decision triggers automatic continuation or documentation
+- Optional custom instructions can guide the continuation project
 
 ### 3. Project Owner Involvement
 Decisions requiring human approval are stored in `/decisions/`:

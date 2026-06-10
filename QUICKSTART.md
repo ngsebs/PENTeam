@@ -109,6 +109,7 @@ cat /app/decisions/pending/[project]/decision-001.md
    - **A) Continue**: Start a new investigation project with the next steps
    - **B) Document**: Save next steps for future consideration
    - **C) End**: Consider investigation complete as-is
+   - Optional custom instructions can be added to guide the continuation
 
 **To respond to a decision:**
 ```bash
@@ -123,6 +124,7 @@ Edit the decision file and add your response:
 **Project Owner Decision**: [A/B/C]
 **Rationale**: [Your reasoning]
 **Approved By**: [Your name]
+**Custom Prompt**: [Optional instructions for continuation]
 **Date**: 2024-01-15
 ```
 

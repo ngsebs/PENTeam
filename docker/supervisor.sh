@@ -359,6 +359,165 @@ Output revised theorems in the same format:
     
     update_task_status "$project_name" "TASK-003" "Completed"
     
+    # Phase 2.5: Decision Escalation - Project Owner Input
+    # Check if any theorems are analytically sound but cannot be computationally represented
+    log_info "Phase 2.5: Checking for theorems requiring project owner decision..."
+    update_progress "$project_name" "Supervisor" "Checking for decision escalation"
+    
+    # Detect theorems that are mathematically valid but computationally problematic
+    local review_content=""
+    [ -f "$project_dir/review/critique.md" ] && review_content=$(cat "$project_dir/review/critique.md")
+    local review_lower=$(echo "$review_content" | tr '[:upper:]' '[:lower:]')
+    
+    local needs_decision=false
+    local theorems_needing_decision=""
+    
+    # Patterns indicating analytically sound but computationally challenging theorems
+    if echo "$review_lower" | grep -qE "analytically sound|mathematically valid|mathematically sound|conceptually correct"; then
+        if echo "$review_lower" | grep -qE "cannot be computed|not computationally|cannot verify computationally|computationally infeasible|no practical algorithm|undecidable|np-complete|exponential complexity"; then
+            needs_decision=true
+            theorems_needing_decision="Theorems flagged as mathematically sound but computationally challenging"
+        fi
+    fi
+    
+    if [ "$needs_decision" = "true" ]; then
+        log_warn "Theorems identified as analytically sound but computationally problematic"
+        
+        # Create decision record for project owner
+        local decision_dir="$DEC_DIR/$project_name"
+        mkdir -p "$decision_dir"
+        
+        cat > "$decision_dir/decision-001.md" << EOF
+# Decision Record: Theorems Requiring Project Owner Input
+
+**Decision ID**: DEC-001
+**Project**: $project_name
+**Date Created**: $(date '+%Y-%m-%d %H:%M:%S')
+**Status**: Pending
+
+## Decision Summary
+
+Some theorems have been identified as mathematically valid/analytically sound but present computational challenges for implementation.
+
+## Background
+
+The Senior Mathematician has reviewed the proposed theorems and identified that certain theorems are:
+- Mathematically correct and significant
+- But cannot be practically implemented with current computational methods
+
+## Theorems Requiring Decision
+
+$theorems_needing_decision
+
+## Senior Mathematician Assessment
+
+$(cat "$project_dir/review/critique.md")
+
+## Options
+
+### Option A: Skip Implementation
+**Proceed with implementation of only computationally feasible theorems**
+- The mathematically sound theorems will be documented but not implemented
+- Focus on what can be computed and verified
+- May limit scope of investigation
+
+### Option B: Approximate Implementation
+**Implement simplified or approximate versions**
+- Use numerical approximations where analytical solutions are infeasible
+- May reduce precision but allows computational exploration
+- Document limitations in implementation
+
+### Option C: Include as Theoretical Reference
+**Document theorems in final report without implementation**
+- Theorems are valid but marked as "theoretical only"
+- Future work may include implementation when methods become available
+- Does not block current investigation
+
+## Recommendation
+
+The Senior Mathematician recommends: **Option C** (Include as Theoretical Reference)
+
+## Required From Project Owner
+
+- [ ] Review the mathematically sound but computationally challenging theorems
+- [ ] Select preferred handling approach (A, B, or C)
+- [ ] Respond in this file or via communication thread
+
+## Response Format
+
+To approve a decision, add your response below:
+
+```
+**Project Owner Decision**: [A/B/C]
+**Rationale**: [Your reasoning]
+**Approved By**: [Your name]
+**Date**: $(date '+%Y-%m-%d %H:%M:%S')
+```
+EOF
+        
+        log_info "Decision record created at $decision_dir/decision-001.md"
+        update_progress "$project_name" "Supervisor" "Awaiting project owner decision on computationally problematic theorems"
+        
+        # Wait for project owner decision with polling
+        local decision_timeout=3600  # 1 hour timeout
+        local decision_start=$(date +%s)
+        local decision_made=false
+        
+        log_info "Waiting for project owner decision (timeout: ${decision_timeout}s)..."
+        
+        while [ "$decision_made" = "false" ]; do
+            local current_time=$(date +%s)
+            local elapsed=$((current_time - decision_start))
+            
+            if [ $elapsed -gt $decision_timeout ]; then
+                log_warn "Decision timeout reached. Proceeding with default (Option C: Theoretical Reference)."
+                update_progress "$project_name" "Supervisor" "Decision timeout - defaulting to Option C"
+                
+                # Add default decision
+                cat >> "$decision_dir/decision-001.md" << EOF
+
+## Default Decision (Timeout)
+
+**Project Owner Decision**: C (Default - Timeout)
+**Rationale**: Decision timeout - defaulting to including theorems as theoretical reference
+**Date**: $(date '+%Y-%m-%d %H:%M:%S')
+EOF
+                break
+            fi
+            
+            # Check for decision response
+            if grep -q "Project Owner Decision" "$decision_dir/decision-001.md" 2>/dev/null; then
+                if grep -q "Approved By" "$decision_dir/decision-001.md" 2>/dev/null; then
+                    decision_made=true
+                    log_info "Project owner decision received!"
+                    update_progress "$project_name" "Supervisor" "Project owner decision received"
+                fi
+            fi
+            
+            if [ "$decision_made" = "false" ]; then
+                log_info "Waiting for decision... (${elapsed}s elapsed)"
+                sleep 30  # Check every 30 seconds
+            fi
+        done
+        
+        # Move decision to appropriate directory based on outcome
+        if grep -q "Project Owner Decision: A\|Project Owner Decision: a" "$decision_dir/decision-001.md" 2>/dev/null; then
+            log_info "Project owner chose Option A: Skip implementation"
+            mkdir -p "$DEC_DIR/approved/$project_name"
+            mv "$decision_dir/decision-001.md" "$DEC_DIR/approved/$project_name/"
+        elif grep -q "Project Owner Decision: B\|Project Owner Decision: b" "$decision_dir/decision-001.md" 2>/dev/null; then
+            log_info "Project owner chose Option B: Approximate implementation"
+            mkdir -p "$DEC_DIR/approved/$project_name"
+            mv "$decision_dir/decision-001.md" "$DEC_DIR/approved/$project_name/"
+        else
+            log_info "Project owner chose Option C: Theoretical reference (default)"
+            mkdir -p "$DEC_DIR/approved/$project_name"
+            mv "$decision_dir/decision-001.md" "$DEC_DIR/approved/$project_name/"
+        fi
+    else
+        log_info "No decision escalation needed - all theorems are computationally feasible"
+    fi
+    
     # Phase 3: Python Coder - Implement
     log_info "Phase 3: Python Coder implementing..."
     update_task_status "$project_name" "TASK-004" "In Progress"

@@ -21,8 +21,10 @@ echo -e "${CYAN}╚════════════════════�
 echo ""
 
 # Check for pending decisions - get all .md files recursively
-mapfile -t pending_files < <(find "$DECISIONS_DIR/pending" -type f -name "*.md" 2>/dev/null | sort)
-pending_count=${#pending_files[@]}
+pending_count=0
+for file in "$DECISIONS_DIR/pending"/*/*.md 2>/dev/null; do
+    [ -f "$file" ] && ((pending_count++))
+done
 
 if [ "$pending_count" -eq 0 ]; then
     echo -e "${GREEN}✓ No pending decisions.${NC}"
@@ -35,7 +37,8 @@ echo ""
 
 # Build associative array of projects and their decision files
 declare -A project_files
-for file in "${pending_files[@]}"; do
+for file in "$DECISIONS_DIR/pending"/*/*.md 2>/dev/null; do
+    [ -f "$file" ] || continue
     project=$(basename "$(dirname "$file")")
     if [ -z "${project_files[$project]}" ]; then
         project_files[$project]="$file"
@@ -70,10 +73,8 @@ fi
 # Resolve selection to project name
 selected_project=""
 if [[ "$selection" =~ ^[0-9]+$ ]]; then
-    # Number-based selection
     selected_project="${num_to_project[$selection]}"
 else
-    # Name-based selection - partial match support
     for proj in $sorted_projects; do
         if [[ "$proj" == *"$selection"* ]] || [[ "$selection" == *"$proj"* ]]; then
             selected_project="$proj"
@@ -92,8 +93,10 @@ echo -e "${CYAN}═════════════════════�
 echo -e "${CYAN}Project: ${BOLD}$selected_project${NC}"
 echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
 
-# Get decision files for selected project
-mapfile -t decision_files < <(echo "${project_files[$selected_project]}" | sort)
+# Get decision files for selected project - convert newline-separated to array
+IFS=$'\n' read -d '' -r -a decision_files <<< "${project_files[$selected_project]}" 2>/dev/null || true
+# Remove empty last element if present
+decision_files=("${decision_files[@]}")
 decision_count=${#decision_files[@]}
 
 # If multiple files, let user select
@@ -198,8 +201,7 @@ echo -e "(Press Enter to skip, or enter multiple lines ending with empty line)"
 free_form_prompt=""
 while read -r line; do
     [ -z "$line" ] && break
-    [ -z "$free_form_prompt" ] && free_form_prompt="$line" || free_form_prompt="$free_form_prompt"$'
-'"$line"
+    [ -z "$free_form_prompt" ] && free_form_prompt="$line" || free_form_prompt="$free_form_prompt"$'\n'"$line"
 done
 
 # Write decision

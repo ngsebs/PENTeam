@@ -6,10 +6,10 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Support both container and local execution paths
-if [ -d "/app/decisions" ]; then
+if [ -d "/app/decisions/pending" ]; then
     DECISIONS_DIR="/app/decisions"
 else
-    DECISIONS_DIR="$SCRIPT_DIR/../decisions"
+    DECISIONS_DIR="$SCRIPT_DIR/../decisions/pending"
 fi
 
 # Colors
